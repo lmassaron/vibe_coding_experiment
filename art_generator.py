@@ -1,5 +1,3 @@
-
-
 import os
 import random
 import wandb
@@ -12,7 +10,7 @@ import threading
 import time
 
 # Initialize W&B run
-run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-web-server")
+run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-web-thumbnails")
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
@@ -97,11 +95,13 @@ def calculate_complexity(iteration_data):
     return np.mean(iteration_data)
 
 def clean_previous_images():
-    """Deletes all previously generated fractal images."""
-    print("Cleaning up previous images...")
+    """Deletes all previously generated fractal images and index.html."""
+    print("Cleaning up previous images and index.html...")
     for f in glob.glob("julia_art_*.png"):
         os.remove(f)
-    print("Previous images cleaned.")
+    if os.path.exists("index.html"):
+        os.remove("index.html")
+    print("Previous images and index.html cleaned.")
 
 PORT = 5555
 Handler = http.server.SimpleHTTPRequestHandler
@@ -111,6 +111,36 @@ def start_server():
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
         print(f"Serving images at http://localhost:{PORT}")
         httpd.serve_forever()
+
+def generate_html_index(image_filenames):
+    """Generates an HTML index file with thumbnails of the images."""
+    html_content = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Julia Fractals</title>
+    <style>
+        body { font-family: sans-serif; background-color: #333; color: #eee; }
+        .container { display: flex; flex-wrap: wrap; gap: 10px; padding: 20px; }
+        .thumbnail { border: 1px solid #555; padding: 5px; background-color: #222; }
+        .thumbnail img { width: 150px; height: 150px; object-fit: cover; }
+    </style>
+</head>
+<body>
+    <h1>Generated Julia Fractals</h1>
+    <div class="container">
+"""
+    for filename in image_filenames:
+        html_content += f"        <div class=\"thumbnail\"><img src=\"{filename}\" alt=\"{filename}\"></div>\n"
+    
+    html_content += """
+    </div>
+</body>
+</html>
+"""
+    with open("index.html", "w") as f:
+        f.write(html_content)
+    print("Generated index.html with thumbnails.")
 
 def main():
     # Start the web server in a separate thread
@@ -125,6 +155,7 @@ def main():
     num_images = 50 # Fixed batch size
     print(f"Generating a batch of {num_images} Julia fractals...")
 
+    generated_image_filenames = []
     for i in range(num_images):
         seed = random.randint(0, 1000000)
         
@@ -139,10 +170,13 @@ def main():
         # Log to W&B Table
         img_path = f"julia_art_{seed}_{palette_name}.png"
         art.save(img_path)
+        generated_image_filenames.append(img_path)
         
         table.add_data(wandb.Image(img_path), palette_name, seed, complexity_score, originality_score)
         
         print(f"Generated and logged Julia art with seed: {seed}, Palette: {palette_name}, Complexity: {complexity_score:.2f}")
+
+    generate_html_index(generated_image_filenames)
 
     # Log the final table to W&B
     run.log({"art_generations": table})
