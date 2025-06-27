@@ -1,3 +1,5 @@
+
+
 import os
 import random
 import wandb
@@ -10,7 +12,7 @@ import threading
 import time
 
 # Initialize W&B run
-run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-web-thumbnails")
+run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-multi-palette")
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
@@ -26,36 +28,149 @@ def generate_julia(c, z, max_iter):
         z = z*z + c
     return max_iter
 
-# --- Guaranteed Blue-Hue Palette ---
-def palette_guaranteed_blue(m):
-    # Define key blue colors
-    dark_blue = np.array([0, 0, 50])
-    medium_blue = np.array([0, 50, 150])
-    azure = np.array([0, 127, 255])
-    light_blue = np.array([100, 200, 255])
+# --- Color Palettes ---
 
-    # Interpolate based on iteration count
-    if m < max_iter / 4:
-        # Dark to medium blue
-        ratio = m / (max_iter / 4)
-        color = dark_blue * (1 - ratio) + medium_blue * ratio
-    elif m < max_iter / 2:
-        # Medium blue to azure
-        ratio = (m - max_iter / 4) / (max_iter / 4)
-        color = medium_blue * (1 - ratio) + azure * ratio
-    elif m < max_iter * 3 / 4:
-        # Azure to light blue
-        ratio = (m - max_iter / 2) / (max_iter / 4)
-        color = azure * (1 - ratio) + light_blue * ratio
-    else:
-        # Light blue to white-ish blue
-        ratio = (m - max_iter * 3 / 4) / (max_iter / 4)
-        color = light_blue * (1 - ratio) + np.array([200, 230, 255]) * ratio
-
+# 1. Maximum Detail and Scientific Analysis
+def palette_viridis_like(m, max_iter):
+    # Simple approximation of Viridis-like, focusing on smooth progression
+    colors = [
+        np.array([68, 1, 84]),   # Dark Purple-Blue
+        np.array([59, 82, 139]), # Blue
+        np.array([33, 145, 140]),# Teal
+        np.array([129, 199, 124]),# Light Green
+        np.array([253, 231, 37]) # Bright Yellow
+    ]
+    
+    idx = int(m / max_iter * (len(colors) - 1))
+    if idx >= len(colors) - 1:
+        return tuple(colors[-1])
+    
+    ratio = (m / max_iter * (len(colors) - 1)) - idx
+    color = colors[idx] * (1 - ratio) + colors[idx+1] * ratio
     return tuple(color.astype(int))
 
+def palette_grayscale(m, max_iter):
+    val = int(m / max_iter * 255)
+    return (val, val, val)
+
+def palette_single_blue_hue(m, max_iter):
+    # Gradient from very dark blue to light blue
+    intensity = m / max_iter
+    r = int(intensity * 50)
+    g = int(intensity * 100)
+    b = int(intensity * 200)
+    return (r, g, b)
+
+# 2. Aesthetic Beauty and Artistic Expression
+def palette_analogous_blue_purple(m, max_iter):
+    # Blue to purple gradient
+    colors = [
+        np.array([0, 0, 100]),   # Dark Blue
+        np.array([50, 0, 150]),  # Medium Purple
+        np.array([100, 0, 200]), # Bright Purple
+        np.array([150, 50, 250]) # Light Purple
+    ]
+    idx = int(m / max_iter * (len(colors) - 1))
+    if idx >= len(colors) - 1:
+        return tuple(colors[-1])
+    
+    ratio = (m / max_iter * (len(colors) - 1)) - idx
+    color = colors[idx] * (1 - ratio) + colors[idx+1] * ratio
+    return tuple(color.astype(int))
+
+def palette_fire(m, max_iter):
+    # Red, Orange, Yellow
+    colors = [
+        np.array([0, 0, 0]),     # Black
+        np.array([100, 0, 0]),   # Dark Red
+        np.array([200, 50, 0]),  # Orange
+        np.array([255, 150, 0]), # Bright Orange
+        np.array([255, 255, 0])  # Yellow
+    ]
+    idx = int(m / max_iter * (len(colors) - 1))
+    if idx >= len(colors) - 1:
+        return tuple(colors[-1])
+    
+    ratio = (m / max_iter * (len(colors) - 1)) - idx
+    color = colors[idx] * (1 - ratio) + colors[idx+1] * ratio
+    return tuple(color.astype(int))
+
+def palette_ocean(m, max_iter):
+    # Deep blue to cyan/white
+    colors = [
+        np.array([0, 0, 50]),    # Deep Navy
+        np.array([0, 50, 150]),  # Medium Blue
+        np.array([0, 150, 200]), # Cyan
+        np.array([150, 255, 255])# Light Cyan
+    ]
+    idx = int(m / max_iter * (len(colors) - 1))
+    if idx >= len(colors) - 1:
+        return tuple(colors[-1])
+    
+    ratio = (m / max_iter * (len(colors) - 1)) - idx
+    color = colors[idx] * (1 - ratio) + colors[idx+1] * ratio
+    return tuple(color.astype(int))
+
+def palette_metallic(m, max_iter):
+    # Grays, silvers, and golds
+    colors = [
+        np.array([0, 0, 0]),     # Black
+        np.array([50, 50, 50]),  # Dark Gray
+        np.array([150, 150, 150]),# Silver
+        np.array([200, 180, 100]),# Gold
+        np.array([255, 230, 150]) # Bright Gold
+    ]
+    idx = int(m / max_iter * (len(colors) - 1))
+    if idx >= len(colors) - 1:
+        return tuple(colors[-1])
+    
+    ratio = (m / max_iter * (len(colors) - 1)) - idx
+    color = colors[idx] * (1 - ratio) + colors[idx+1] * ratio
+    return tuple(color.astype(int))
+
+def palette_nebula(m, max_iter):
+    # Dark purples, blues, magentas, with bright highlights
+    colors = [
+        np.array([0, 0, 0]),     # Black
+        np.array([20, 0, 40]),   # Dark Purple
+        np.array([40, 0, 80]),   # Medium Purple
+        np.array([80, 0, 160]),  # Bright Purple
+        np.array([120, 0, 200]), # Magenta-Blue
+        np.array([200, 100, 255]),# Light Magenta
+        np.array([255, 255, 255]) # White (for stars)
+    ]
+    idx = int(m / max_iter * (len(colors) - 1))
+    if idx >= len(colors) - 1:
+        return tuple(colors[-1])
+    
+    ratio = (m / max_iter * (len(colors) - 1)) - idx
+    color = colors[idx] * (1 - ratio) + colors[idx+1] * ratio
+    return tuple(color.astype(int))
+
+# 3. Classic Psychedelic Look
+def palette_psychedelic(m, max_iter):
+    # Small, repeating, high-contrast palette
+    psy_colors = [
+        (255, 0, 0),   # Red
+        (255, 127, 0), # Orange
+        (255, 255, 0), # Yellow
+        (0, 255, 0),   # Green
+        (0, 0, 255),   # Blue
+        (75, 0, 130),  # Indigo
+        (148, 0, 211)  # Violet
+    ]
+    return psy_colors[m % len(psy_colors)]
+
 palettes = {
-    "guaranteed_blue": palette_guaranteed_blue,
+    "viridis_like": palette_viridis_like,
+    "grayscale": palette_grayscale,
+    "single_blue_hue": palette_single_blue_hue,
+    "analogous_blue_purple": palette_analogous_blue_purple,
+    "fire": palette_fire,
+    "ocean": palette_ocean,
+    "metallic": palette_metallic,
+    "nebula": palette_nebula,
+    "psychedelic": palette_psychedelic,
 }
 
 def generate_fractal(seed, palette_func):
@@ -83,7 +198,7 @@ def generate_fractal(seed, palette_func):
             if m == max_iter:
                 color = (0, 0, 0) 
             else:
-                color = palette_func(m)
+                color = palette_func(m, max_iter) # Pass max_iter to palette function
             
             pixels[x, y] = color
             iteration_data[x, y] = m
