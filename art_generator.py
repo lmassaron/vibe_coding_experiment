@@ -22,7 +22,7 @@ if use_wandb:
 # --- Art Generation Parameters ---
 width, height = 512, 512
 max_iter = 150 # Max iterations for fractal calculation
-IMAGE_DIR = "generated_images"
+IMAGE_DIR_NAME = "generated_images"
 
 def generate_julia(c, z, max_iter):
     for n in range(max_iter):
@@ -206,8 +206,8 @@ def calculate_complexity(iteration_data):
 def clean_previous_images():
     """Deletes all previously generated fractal images and index.html."""
     print("Cleaning up previous images and index.html...")
-    if os.path.exists(IMAGE_DIR):
-        shutil.rmtree(IMAGE_DIR)
+    if os.path.exists(IMAGE_DIR_NAME):
+        shutil.rmtree(IMAGE_DIR_NAME)
     if os.path.exists("index.html"):
         os.remove("index.html")
     print("Previous images and index.html cleaned.")
@@ -215,13 +215,14 @@ def clean_previous_images():
 PORT = 5555
 Handler = http.server.SimpleHTTPRequestHandler
 
-def start_server():
-    """Starts a simple HTTP server in a new thread."""
-    # Change current directory to IMAGE_DIR for serving
-    os.makedirs(IMAGE_DIR, exist_ok=True)
-    os.chdir(IMAGE_DIR)
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        print(f"Serving images at http://localhost:{PORT}")
+def start_server(directory):
+    """Starts a simple HTTP server in a new thread, serving from the specified directory."""
+    class CustomHandler(Handler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=directory, **kwargs)
+
+    with socketserver.TCPServer(("", PORT), CustomHandler) as httpd:
+        print(f"Serving images from {directory} at http://localhost:{PORT}")
         httpd.serve_forever()
 
 def generate_html_index(image_filenames):
@@ -242,33 +243,35 @@ def generate_html_index(image_filenames):
     <h1>Generated Julia Fractals</h1>
     <div class="container">
 """
-    # Image filenames are now relative to IMAGE_DIR
+    # Image filenames are now relative to IMAGE_DIR_NAME
     for filename in image_filenames:
-        html_content += f"        <div class=\"thumbnail\"><img src=\"{os.path.basename(filename)}\" alt=\"{os.path.basename(filename)}\"></div>\n"
+        # Use os.path.join to create the correct relative path for HTML
+        html_content += f"        <div class=\"thumbnail\"><img src=\"{os.path.join(IMAGE_DIR_NAME, os.path.basename(filename))}\" alt=\"{os.path.basename(filename)}\"></div>\n"
     
     html_content += """
     </div>
 </body>
 </html>
 """
-    # Write index.html to the parent directory, as the server changes directory
-    with open(os.path.join(os.path.dirname(os.getcwd()), "index.html"), "w") as f:
+    # Write index.html to the main project directory
+    with open("index.html", "w") as f:
         f.write(html_content)
     print("Generated index.html with thumbnails.")
 
 def main():
-    # Start the web server in a separate thread
-    server_thread = threading.Thread(target=start_server, daemon=True)
+    # Get the current working directory (where the script is run from)
+    current_cwd = os.getcwd()
+    image_full_path = os.path.join(current_cwd, IMAGE_DIR_NAME)
+
+    # Start the web server in a separate thread, serving from IMAGE_DIR_NAME
+    server_thread = threading.Thread(target=start_server, args=(image_full_path,), daemon=True)
     server_thread.start()
     
     # Give the server a moment to start up
     time.sleep(1)
 
-    # Change back to original directory before cleanup and image generation
-    original_cwd = os.getcwd()
-    os.chdir(original_cwd)
     clean_previous_images()
-    os.makedirs(IMAGE_DIR, exist_ok=True)
+    os.makedirs(image_full_path, exist_ok=True)
 
     num_images = 100 # Fixed batch size
     print(f"Generating a batch of {num_images} Julia fractals...")
@@ -287,7 +290,7 @@ def main():
 
         # Log to W&B Table
         img_filename = f"julia_art_{seed}_{palette_name}.png"
-        img_path = os.path.join(IMAGE_DIR, img_filename)
+        img_path = os.path.join(image_full_path, img_filename)
         art.save(img_path)
         generated_image_filenames.append(img_path)
         
@@ -297,7 +300,6 @@ def main():
         print(f"Generated and logged Julia art with seed: {seed}, Palette: {palette_name}, Complexity: {complexity_score:.2f}")
 
     # Generate HTML index in the original directory
-    os.chdir(original_cwd)
     generate_html_index(generated_image_filenames)
 
     # Log the final table to W&B
