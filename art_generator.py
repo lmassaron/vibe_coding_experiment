@@ -7,11 +7,11 @@ import numpy as np
 from PIL import Image
 
 # Initialize W&B run
-run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-vibrant")
+run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-brilliant-blue-hues")
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
-max_iter = 150 # Increased for more complexity potential
+max_iter = 150 # Max iterations for fractal calculation
 
 # Updated table with scoring columns
 table = wandb.Table(columns=["image", "palette_name", "seed", "complexity_score", "originality_score"])
@@ -23,38 +23,40 @@ def generate_julia(c, z, max_iter):
         z = z*z + c
     return max_iter
 
-# --- Vibrant Color Palettes ---
-def palette_rainbow(m):
-    # Cycles through hues based on iteration count
-    hue = (m * 7) % 256
-    r = int(np.sin(0.024 * hue + 0) * 127 + 128)
-    g = int(np.sin(0.024 * hue + 2) * 127 + 128)
-    b = int(np.sin(0.024 * hue + 4) * 127 + 128)
+# --- Brilliant Blue-Hue Color Palettes ---
+def palette_deep_space(m):
+    # Dark blues, purples, and hints of brighter stars, more brilliant
+    r = int(np.sin(0.02 * m) * 50 + 50)
+    g = int(np.sin(0.02 * m + 2) * 70 + 80)
+    b = int(np.sin(0.02 * m + 4) * 120 + 130)
     return (r, g, b)
 
-def palette_deep_ocean(m):
-    # Blues and greens with some darker tones
-    r = int(np.sin(0.05 * m) * 60 + 60)
-    g = int(np.sin(0.05 * m + 2) * 80 + 100)
-    b = int(np.sin(0.05 * m + 4) * 100 + 150)
+def palette_cosmic_ice(m):
+    # Lighter blues, cyans, and whites, more brilliant
+    r = int(np.sin(0.03 * m) * 80 + 120)
+    g = int(np.sin(0.03 * m + 2) * 100 + 150)
+    b = int(np.sin(0.03 * m + 4) * 150 + 200)
     return (r, g, b)
 
-def palette_sunset(m):
-    # Oranges, reds, and purples
-    r = int(np.sin(0.03 * m + 0) * 100 + 150)
-    g = int(np.sin(0.03 * m + 2) * 50 + 70)
-    b = int(np.sin(0.03 * m + 4) * 80 + 100)
+def palette_azure_dream(m):
+    # Azure tones (blue-green), more brilliant
+    r = int(np.sin(0.04 * m) * 70 + 80)
+    g = int(np.sin(0.04 * m + 2) * 120 + 130)
+    b = int(np.sin(0.04 * m + 4) * 150 + 180)
     return (r, g, b)
 
-# Keeping some of the previous ones if they were not considered dull
-def palette_fire(m):
-    return (m % 256, (m * 2) % 256, (m * 3) % 256)
+def palette_dark_blue(m):
+    # Solid, dark blue tones, more brilliant
+    r = int(np.sin(0.01 * m) * 20 + 30)
+    g = int(np.sin(0.01 * m + 2) * 60 + 70)
+    b = int(np.sin(0.01 * m + 4) * 100 + 120)
+    return (r, g, b)
 
 palettes = {
-    "rainbow": palette_rainbow,
-    "deep_ocean": palette_deep_ocean,
-    "sunset": palette_sunset,
-    "fire": palette_fire,
+    "deep_space": palette_deep_space,
+    "cosmic_ice": palette_cosmic_ice,
+    "azure_dream": palette_azure_dream,
+    "dark_blue": palette_dark_blue,
 }
 
 def generate_fractal(seed, palette_func):
@@ -77,7 +79,12 @@ def generate_fractal(seed, palette_func):
             z = complex(real, imag)
 
             m = generate_julia(c, z, max_iter)
-            color = palette_func(m)
+            
+            # Set color to black if the point does not escape (background)
+            if m == max_iter:
+                color = (0, 0, 0) 
+            else:
+                color = palette_func(m)
             
             pixels[x, y] = color
             iteration_data[x, y] = m
@@ -89,8 +96,8 @@ def calculate_complexity(iteration_data):
     return np.mean(iteration_data)
 
 def main():
-    num_images = random.randint(10, 20)
-    print(f"Generating a batch of {num_images} Julia fractals with vibrant palettes...")
+    num_images = 50 # Fixed batch size
+    print(f"Generating a batch of {num_images} Julia fractals with brilliant blue-hue palettes and black backgrounds...")
 
     for i in range(num_images):
         seed = random.randint(0, 1000000)
@@ -115,7 +122,7 @@ def main():
     run.log({"art_generations": table})
     run.finish()
     print("\nBatch generation complete. Check your W&B dashboard to see the scored fractals!")
+    print("To rank by 'beauty', you can add a custom column in the W&B UI and manually assign scores.")
 
 if __name__ == "__main__":
     main()
-
