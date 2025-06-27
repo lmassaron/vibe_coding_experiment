@@ -14,6 +14,7 @@ The process answers a simple question for every single pixel on the canvas: *"If
 The incredible detail and complexity of the fractal emerges from the razor-thin, chaotic boundary between the points that escape and those that stay put.
 
 ![Julia Set Example](julia_art_60377_metallic.png)
+
 *(Image: A Julia set generated with c = 0.355 + 0.355i)*
 
 ## How It's Generated: The Math
