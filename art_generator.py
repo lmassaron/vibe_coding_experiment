@@ -1,48 +1,65 @@
+
 import os
 import random
 import wandb
-from PIL import Image, ImageDraw
+import numpy as np
+from PIL import Image
 
 # Initialize W&B run
 run = wandb.init(project="VibeCoding", job_type="art-generation")
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
-# Every time a new piece of art is generated, log the image to a W&B Table
-# Also, log the parameters that created it
-table = wandb.Table(columns=["image", "seed", "num_shapes", "vibe_score", "tags"])
+max_iter = 100 # Max iterations for fractal calculation
 
-def generate_art(seed):
-    """Generates a unique piece of abstract art based on a seed."""
+table = wandb.Table(columns=["image", "art_type", "seed", "vibe_score", "tags"])
+
+def generate_mandelbrot(c, max_iter):
+    z = c
+    for n in range(max_iter):
+        if abs(z) > 2:
+            return n
+        z = z*z + c
+    return max_iter
+
+def generate_julia(c, z, max_iter):
+    for n in range(max_iter):
+        if abs(z) > 2:
+            return n
+        z = z*z + c
+    return max_iter
+
+def generate_fractal(art_type, seed):
+    """Generates a Mandelbrot or Julia set fractal."""
     random.seed(seed)
+    
+    # --- Fractal Parameters ---
+    c_real = random.uniform(-2, 1)
+    c_imag = random.uniform(-1.5, 1.5)
+    z_real = random.uniform(-1, 1)
+    z_imag = random.uniform(-1, 1)
+    
     img = Image.new('RGB', (width, height), color = 'black')
-    draw = ImageDraw.Draw(img)
+    pixels = img.load()
 
-    num_shapes = random.randint(5, 50)
+    for x in range(width):
+        for y in range(height):
+            # Scale and translate pixel coordinates to complex plane
+            real = (x - width / 2) * 4 / width
+            imag = (y - height / 2) * 4 / height
 
-    for _ in range(num_shapes):
-        shape_type = random.choice(['rectangle', 'ellipse', 'line'])
-        
-        # Random color
-        r = random.randint(0, 255)
-        g = random.randint(0, 255)
-        b = random.randint(0, 255)
-        color = (r, g, b)
-
-        # Random position and size
-        x1 = random.randint(0, width)
-        y1 = random.randint(0, height)
-        x2 = random.randint(0, width)
-        y2 = random.randint(0, height)
-
-        if shape_type == 'rectangle':
-            draw.rectangle([min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)], fill=color)
-        elif shape_type == 'ellipse':
-            draw.ellipse([min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)], fill=color)
-        elif shape_type == 'line':
-            draw.line([x1, y1, x2, y2], fill=color, width=random.randint(1, 5))
+            if art_type == 'mandelbrot':
+                m = generate_mandelbrot(complex(real, imag), max_iter)
+                color = (m % 256, (m * 5) % 256, (m * 10) % 256)
+            elif art_type == 'julia':
+                c = complex(c_real, c_imag)
+                z = complex(real, imag)
+                m = generate_julia(c, z, max_iter)
+                color = ((m*2) % 256, (m*7) % 256, (m*13) % 256)
             
-    return img, num_shapes
+            pixels[x, y] = color
+            
+    return img
 
 def main():
     print("Press 'g' to generate new art, or 'q' to quit.")
@@ -51,20 +68,17 @@ def main():
         user_input = input()
         if user_input.lower() == 'g':
             seed = random.randint(0, 1000000)
-            art, num_shapes = generate_art(seed)
+            art_type = random.choice(['mandelbrot', 'julia'])
+            
+            art = generate_fractal(art_type, seed)
             
             # Log to W&B Table
-            img_path = f"art_{seed}.png"
+            img_path = f"art_{art_type}_{seed}.png"
             art.save(img_path)
             
-            # Add data to the table
-            # In your Weave dashboard, view the table of generated images
-            # Use Weave's tools to "score" your own creations
-            # Add a column to your table for a "vibe_score" (a rating from 1-10)
-            # or subjective tags like "chaotic," "calm," or "colorful."
-            table.add_data(wandb.Image(img_path), seed, num_shapes, None, None)
+            table.add_data(wandb.Image(img_path), art_type, seed, None, None)
             
-            print(f"Generated and logged art with seed: {seed}")
+            print(f"Generated and logged {art_type} art with seed: {seed}")
             
         elif user_input.lower() == 'q':
             break
