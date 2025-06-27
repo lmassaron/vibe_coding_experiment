@@ -1,4 +1,3 @@
-
 import os
 import glob
 import http.server
@@ -15,11 +14,13 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 def start_server(directory):
     """Starts a simple HTTP server in a new thread, serving from the specified directory."""
     try:
-        with socketserver.TCPServer(("", PORT), lambda *args, **kwargs: CustomHandler(*args, directory=directory, **kwargs)) as httpd:
-            print(f"Serving images from {directory} at http://localhost:{PORT}")
-            httpd.serve_forever()
+        httpd = socketserver.TCPServer(("", PORT), lambda *args, **kwargs: CustomHandler(*args, directory=directory, **kwargs))
+        print(f"Serving images from {directory} at http://localhost:{PORT}")
+        httpd.serve_forever()
+        return httpd # Return the httpd object
     except Exception as e:
         print(f"Error starting server: {e}")
+        return None
 
 def clean_previous_images(image_dir, index_html_path):
     """Deletes all previously generated fractal images and index.html."""

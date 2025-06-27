@@ -38,7 +38,9 @@ def main():
     index_html_path = os.path.join(current_cwd, "index.html")
 
     # Start the web server in a separate thread
-    server_thread = threading.Thread(target=start_server, args=(image_full_path,), daemon=True)
+    # The server_thread will now return the httpd object
+    httpd_instance = None
+    server_thread = threading.Thread(target=lambda: globals().update(httpd_instance=start_server(image_full_path)))
     server_thread.start()
     
     # Give the server a moment to start up
@@ -93,6 +95,17 @@ def main():
     print("\nBatch generation complete. Check your W&B dashboard to see the scored fractals! (if API key was set)")
     print(f"You can also view the generated images locally at http://localhost:{args.port}")
     print("To rank by 'beauty', you can add a custom column in the W&B UI and manually assign scores.")
+    print("Press Ctrl+C to stop the web server and exit.")
+
+    try:
+        # Keep the main thread alive to allow the server thread to continue running
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopping server and exiting.")
+        if httpd_instance:
+            httpd_instance.shutdown()
+            httpd_instance.server_close()
 
 if __name__ == "__main__":
     main()
