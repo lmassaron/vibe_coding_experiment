@@ -1,11 +1,18 @@
+
+
 import os
 import random
 import wandb
 import numpy as np
 from PIL import Image
+import glob
+import http.server
+import socketserver
+import threading
+import time
 
 # Initialize W&B run
-run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-guaranteed-blue-hues")
+run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-web-server")
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
@@ -89,9 +96,34 @@ def calculate_complexity(iteration_data):
     """Calculates a complexity score based on the average iteration count."""
     return np.mean(iteration_data)
 
+def clean_previous_images():
+    """Deletes all previously generated fractal images."""
+    print("Cleaning up previous images...")
+    for f in glob.glob("julia_art_*.png"):
+        os.remove(f)
+    print("Previous images cleaned.")
+
+PORT = 5555
+Handler = http.server.SimpleHTTPRequestHandler
+
+def start_server():
+    """Starts a simple HTTP server in a new thread."""
+    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+        print(f"Serving images at http://localhost:{PORT}")
+        httpd.serve_forever()
+
 def main():
+    # Start the web server in a separate thread
+    server_thread = threading.Thread(target=start_server, daemon=True)
+    server_thread.start()
+    
+    # Give the server a moment to start up
+    time.sleep(1)
+
+    clean_previous_images()
+
     num_images = 50 # Fixed batch size
-    print(f"Generating a batch of {num_images} Julia fractals with guaranteed blue-hue palettes and black backgrounds...")
+    print(f"Generating a batch of {num_images} Julia fractals...")
 
     for i in range(num_images):
         seed = random.randint(0, 1000000)
@@ -116,6 +148,7 @@ def main():
     run.log({"art_generations": table})
     run.finish()
     print("\nBatch generation complete. Check your W&B dashboard to see the scored fractals!")
+    print(f"You can also view the generated images locally at http://localhost:{PORT}")
     print("To rank by 'beauty', you can add a custom column in the W&B UI and manually assign scores.")
 
 if __name__ == "__main__":
