@@ -1,11 +1,9 @@
-
 import os
 import random
 import wandb
 from PIL import Image, ImageDraw
 
 # Initialize W&B run
-wandb.login(key='YOUR_API_KEY')
 run = wandb.init(project="VibeCoding", job_type="art-generation")
 
 # --- Art Generation Parameters ---
@@ -38,9 +36,9 @@ def generate_art(seed):
         y2 = random.randint(0, height)
 
         if shape_type == 'rectangle':
-            draw.rectangle([x1, y1, x2, y2], fill=color)
+            draw.rectangle([min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)], fill=color)
         elif shape_type == 'ellipse':
-            draw.ellipse([x1, y1, x2, y2], fill=color)
+            draw.ellipse([min(x1, x2), min(y1, y2), max(x1, x2), max(y1, y2)], fill=color)
         elif shape_type == 'line':
             draw.line([x1, y1, x2, y2], fill=color, width=random.randint(1, 5))
             
