@@ -10,16 +10,19 @@ import http.server
 import socketserver
 import threading
 import time
+import shutil
 
-# Initialize W&B run
-run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-multi-palette")
+# Conditional W&B Initialization
+use_wandb = os.environ.get("WANDB_API_KEY") is not None
+if use_wandb:
+    run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-psychedelic-only")
+    # Updated table with scoring columns
+    table = wandb.Table(columns=["image", "palette_name", "seed", "complexity_score", "originality_score"])
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
 max_iter = 150 # Max iterations for fractal calculation
-
-# Updated table with scoring columns
-table = wandb.Table(columns=["image", "palette_name", "seed", "complexity_score", "originality_score"])
+IMAGE_DIR = "generated_images"
 
 def generate_julia(c, z, max_iter):
     for n in range(max_iter):
@@ -29,8 +32,6 @@ def generate_julia(c, z, max_iter):
     return max_iter
 
 # --- Color Palettes ---
-
-# 1. Maximum Detail and Scientific Analysis
 def palette_viridis_like(m, max_iter):
     # Simple approximation of Viridis-like, focusing on smooth progression
     colors = [
@@ -162,14 +163,6 @@ def palette_psychedelic(m, max_iter):
     return psy_colors[m % len(psy_colors)]
 
 palettes = {
-    "viridis_like": palette_viridis_like,
-    "grayscale": palette_grayscale,
-    "single_blue_hue": palette_single_blue_hue,
-    "analogous_blue_purple": palette_analogous_blue_purple,
-    "fire": palette_fire,
-    "ocean": palette_ocean,
-    "metallic": palette_metallic,
-    "nebula": palette_nebula,
     "psychedelic": palette_psychedelic,
 }
 
@@ -182,7 +175,8 @@ def generate_fractal(seed, palette_func):
     c_imag = random.uniform(-1, 1)
     c = complex(c_real, c_imag)
     
-    img = Image.new('RGB', (width, height), color = 'black')
+    # Change background to white
+    img = Image.new('RGB', (width, height), color = 'white')
     pixels = img.load()
     iteration_data = np.zeros((width, height))
 
@@ -194,9 +188,9 @@ def generate_fractal(seed, palette_func):
 
             m = generate_julia(c, z, max_iter)
             
-            # Set color to black if the point does not escape (background)
+            # Set color to white if the point does not escape (background)
             if m == max_iter:
-                color = (0, 0, 0) 
+                color = (255, 255, 255) 
             else:
                 color = palette_func(m, max_iter) # Pass max_iter to palette function
             
@@ -212,8 +206,8 @@ def calculate_complexity(iteration_data):
 def clean_previous_images():
     """Deletes all previously generated fractal images and index.html."""
     print("Cleaning up previous images and index.html...")
-    for f in glob.glob("julia_art_*.png"):
-        os.remove(f)
+    if os.path.exists(IMAGE_DIR):
+        shutil.rmtree(IMAGE_DIR)
     if os.path.exists("index.html"):
         os.remove("index.html")
     print("Previous images and index.html cleaned.")
@@ -223,6 +217,9 @@ Handler = http.server.SimpleHTTPRequestHandler
 
 def start_server():
     """Starts a simple HTTP server in a new thread."""
+    # Change current directory to IMAGE_DIR for serving
+    os.makedirs(IMAGE_DIR, exist_ok=True)
+    os.chdir(IMAGE_DIR)
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
         print(f"Serving images at http://localhost:{PORT}")
         httpd.serve_forever()
@@ -245,15 +242,17 @@ def generate_html_index(image_filenames):
     <h1>Generated Julia Fractals</h1>
     <div class="container">
 """
+    # Image filenames are now relative to IMAGE_DIR
     for filename in image_filenames:
-        html_content += f"        <div class=\"thumbnail\"><img src=\"{filename}\" alt=\"{filename}\"></div>\n"
+        html_content += f"        <div class=\"thumbnail\"><img src=\"{os.path.basename(filename)}\" alt=\"{os.path.basename(filename)}\"></div>\n"
     
     html_content += """
     </div>
 </body>
 </html>
 """
-    with open("index.html", "w") as f:
+    # Write index.html to the parent directory, as the server changes directory
+    with open(os.path.join(os.path.dirname(os.getcwd()), "index.html"), "w") as f:
         f.write(html_content)
     print("Generated index.html with thumbnails.")
 
@@ -265,9 +264,13 @@ def main():
     # Give the server a moment to start up
     time.sleep(1)
 
+    # Change back to original directory before cleanup and image generation
+    original_cwd = os.getcwd()
+    os.chdir(original_cwd)
     clean_previous_images()
+    os.makedirs(IMAGE_DIR, exist_ok=True)
 
-    num_images = 50 # Fixed batch size
+    num_images = 100 # Fixed batch size
     print(f"Generating a batch of {num_images} Julia fractals...")
 
     generated_image_filenames = []
@@ -283,20 +286,26 @@ def main():
         originality_score = seed # Using the seed as a direct originality metric
 
         # Log to W&B Table
-        img_path = f"julia_art_{seed}_{palette_name}.png"
+        img_filename = f"julia_art_{seed}_{palette_name}.png"
+        img_path = os.path.join(IMAGE_DIR, img_filename)
         art.save(img_path)
         generated_image_filenames.append(img_path)
         
-        table.add_data(wandb.Image(img_path), palette_name, seed, complexity_score, originality_score)
+        if use_wandb:
+            table.add_data(wandb.Image(img_path), palette_name, seed, complexity_score, originality_score)
         
         print(f"Generated and logged Julia art with seed: {seed}, Palette: {palette_name}, Complexity: {complexity_score:.2f}")
 
+    # Generate HTML index in the original directory
+    os.chdir(original_cwd)
     generate_html_index(generated_image_filenames)
 
     # Log the final table to W&B
-    run.log({"art_generations": table})
-    run.finish()
-    print("\nBatch generation complete. Check your W&B dashboard to see the scored fractals!")
+    if use_wandb:
+        run.log({"art_generations": table})
+        run.finish()
+    
+    print("\nBatch generation complete. Check your W&B dashboard to see the scored fractals! (if API key was set)")
     print(f"You can also view the generated images locally at http://localhost:{PORT}")
     print("To rank by 'beauty', you can add a custom column in the W&B UI and manually assign scores.")
 
