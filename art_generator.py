@@ -1,5 +1,3 @@
-
-
 import os
 import random
 import wandb
@@ -7,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 # Initialize W&B run
-run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-brilliant-blue-hues")
+run = wandb.init(project="VibeCoding", job_type="julia-fractal-generation-guaranteed-blue-hues")
 
 # --- Art Generation Parameters ---
 width, height = 512, 512
@@ -23,40 +21,36 @@ def generate_julia(c, z, max_iter):
         z = z*z + c
     return max_iter
 
-# --- Brilliant Blue-Hue Color Palettes ---
-def palette_deep_space(m):
-    # Dark blues, purples, and hints of brighter stars, more brilliant
-    r = int(np.sin(0.02 * m) * 50 + 50)
-    g = int(np.sin(0.02 * m + 2) * 70 + 80)
-    b = int(np.sin(0.02 * m + 4) * 120 + 130)
-    return (r, g, b)
+# --- Guaranteed Blue-Hue Palette ---
+def palette_guaranteed_blue(m):
+    # Define key blue colors
+    dark_blue = np.array([0, 0, 50])
+    medium_blue = np.array([0, 50, 150])
+    azure = np.array([0, 127, 255])
+    light_blue = np.array([100, 200, 255])
 
-def palette_cosmic_ice(m):
-    # Lighter blues, cyans, and whites, more brilliant
-    r = int(np.sin(0.03 * m) * 80 + 120)
-    g = int(np.sin(0.03 * m + 2) * 100 + 150)
-    b = int(np.sin(0.03 * m + 4) * 150 + 200)
-    return (r, g, b)
+    # Interpolate based on iteration count
+    if m < max_iter / 4:
+        # Dark to medium blue
+        ratio = m / (max_iter / 4)
+        color = dark_blue * (1 - ratio) + medium_blue * ratio
+    elif m < max_iter / 2:
+        # Medium blue to azure
+        ratio = (m - max_iter / 4) / (max_iter / 4)
+        color = medium_blue * (1 - ratio) + azure * ratio
+    elif m < max_iter * 3 / 4:
+        # Azure to light blue
+        ratio = (m - max_iter / 2) / (max_iter / 4)
+        color = azure * (1 - ratio) + light_blue * ratio
+    else:
+        # Light blue to white-ish blue
+        ratio = (m - max_iter * 3 / 4) / (max_iter / 4)
+        color = light_blue * (1 - ratio) + np.array([200, 230, 255]) * ratio
 
-def palette_azure_dream(m):
-    # Azure tones (blue-green), more brilliant
-    r = int(np.sin(0.04 * m) * 70 + 80)
-    g = int(np.sin(0.04 * m + 2) * 120 + 130)
-    b = int(np.sin(0.04 * m + 4) * 150 + 180)
-    return (r, g, b)
-
-def palette_dark_blue(m):
-    # Solid, dark blue tones, more brilliant
-    r = int(np.sin(0.01 * m) * 20 + 30)
-    g = int(np.sin(0.01 * m + 2) * 60 + 70)
-    b = int(np.sin(0.01 * m + 4) * 100 + 120)
-    return (r, g, b)
+    return tuple(color.astype(int))
 
 palettes = {
-    "deep_space": palette_deep_space,
-    "cosmic_ice": palette_cosmic_ice,
-    "azure_dream": palette_azure_dream,
-    "dark_blue": palette_dark_blue,
+    "guaranteed_blue": palette_guaranteed_blue,
 }
 
 def generate_fractal(seed, palette_func):
@@ -97,7 +91,7 @@ def calculate_complexity(iteration_data):
 
 def main():
     num_images = 50 # Fixed batch size
-    print(f"Generating a batch of {num_images} Julia fractals with brilliant blue-hue palettes and black backgrounds...")
+    print(f"Generating a batch of {num_images} Julia fractals with guaranteed blue-hue palettes and black backgrounds...")
 
     for i in range(num_images):
         seed = random.randint(0, 1000000)
