@@ -7,19 +7,25 @@ import shutil
 
 PORT = 5555
 
-class CustomHandler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, directory=None, **kwargs):
-        super().__init__(*args, directory=directory, **kwargs)
-
-def start_server(directory):
+def start_server(directory, port):
     """Starts a simple HTTP server in a new thread, serving from the specified directory."""
+    
+    class CustomHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=directory, **kwargs)
+
+    httpd = None
     try:
-        httpd = socketserver.TCPServer(("", PORT), lambda *args, **kwargs: CustomHandler(*args, directory=directory, **kwargs))
-        print(f"Serving images from {directory} at http://localhost:{PORT}")
-        httpd.serve_forever()
-        return httpd # Return the httpd object
+        httpd = socketserver.TCPServer(("", port), CustomHandler)
+        print(f"Serving from '{directory}' at http://localhost:{port}")
+        
+        # Return the server instance so it can be shut down later
+        return httpd
+        
     except Exception as e:
         print(f"Error starting server: {e}")
+        if httpd:
+            httpd.server_close()
         return None
 
 def clean_previous_images(image_dir, index_html_path):
@@ -71,14 +77,15 @@ def generate_html_index(image_filenames, image_dir_name, index_html_path):
 """
     for img_path, metadata in image_filenames:
         # Use os.path.join to create the correct relative path for HTML
-        # metadata is a tuple: (palette_name, seed, complexity_score, originality_score)
+        # metadata is a tuple: (palette_name, seed, complexity_score, originality_score, julia_c_value)
         html_content += f"""
         <div class="thumbnail">
             <img src="{os.path.join(image_dir_name, os.path.basename(img_path))}" alt="{os.path.basename(img_path)}">
             <p><strong>Palette:</strong> {metadata[0]}</p>
             <p><strong>Seed:</strong> {metadata[1]}</p>
             <p><strong>Complexity:</strong> {metadata[2]:.2f}</p>
-            <p><strong>Originality:</strong> {metadata[3]}</p>
+            <p><strong>Originality:</strong> {metadata[3]:.2f}</p>
+            <p><strong>C-Value:</strong> {metadata[4]}</p>
         </div>
 """
     

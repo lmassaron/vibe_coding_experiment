@@ -17,6 +17,12 @@ def calculate_complexity(iteration_data):
     """Calculates a complexity score based on the average iteration count."""
     return np.mean(iteration_data)
 
+def calculate_originality(image_array):
+    """Calculates an originality score based on the standard deviation of pixel values."""
+    # Convert to grayscale for a single channel to analyze brightness distribution
+    gray_img = np.dot(image_array[...,:3], [0.2989, 0.5870, 0.1140])
+    return np.std(gray_img)
+
 def generate_fractal(width, height, max_iter, c_value, palette_func):
     """Generates a Julia set fractal and returns the image and its iteration data for scoring."""
     img_array = np.zeros((height, width, 3), dtype=np.uint8)
