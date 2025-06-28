@@ -40,7 +40,7 @@ def main():
     # Start the web server in a separate thread
     # The server_thread will now return the httpd object
     httpd_instance = None
-    server_thread = threading.Thread(target=lambda: globals().update(httpd_instance=start_server(image_full_path)))
+    server_thread = threading.Thread(target=lambda: globals().update(httpd_instance=start_server(current_cwd)))
     server_thread.start()
     
     # Give the server a moment to start up
